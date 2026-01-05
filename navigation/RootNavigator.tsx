@@ -2,6 +2,8 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import LoginScreen from "@/screens/LoginScreen";
+import RegisterScreen from "@/screens/RegisterScreen";
+import ForgotPasswordScreen from "@/screens/ForgotPasswordScreen";
 import ClientTabNavigator from "@/navigation/ClientTabNavigator";
 import ProfessionalTabNavigator from "@/navigation/ProfessionalTabNavigator";
 import ProfessionalDetailScreen from "@/screens/ProfessionalDetailScreen";
@@ -14,6 +16,8 @@ import { getCommonScreenOptions } from "@/navigation/screenOptions";
 
 export type RootStackParamList = {
   Login: undefined;
+  Register: undefined;
+  ForgotPassword: undefined;
   ClientMain: undefined;
   ProfessionalMain: undefined;
   ProfessionalDetail: { professionalId: string };
@@ -36,7 +40,11 @@ export default function RootNavigator() {
       }}
     >
       {!isAuthenticated ? (
-        <Stack.Screen name="Login" component={LoginScreen} />
+        <>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+        </>
       ) : user?.role === "professional" ? (
         <>
           <Stack.Screen name="ProfessionalMain" component={ProfessionalTabNavigator} />

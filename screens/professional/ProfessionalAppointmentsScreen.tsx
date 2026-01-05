@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { StyleSheet, View, Pressable, FlatList } from "react-native";
+import { StyleSheet, View, Pressable, FlatList, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
@@ -14,8 +14,9 @@ import Animated, {
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { PROFESSIONAL_APPOINTMENTS, getStatusColor } from "@/data/mockData";
+import { getStatusColor } from "@/data/mockData";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
+import { appointmentService } from "@/services/appointmentService";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -59,9 +60,13 @@ function TabButton({
 function AppointmentCard({
   appointment,
   onPress,
+  onComplete,
+  onCancel,
 }: {
-  appointment: (typeof PROFESSIONAL_APPOINTMENTS)[0];
+  appointment: any;
   onPress: () => void;
+  onComplete: () => void;
+  onCancel: () => void;
 }) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
@@ -115,30 +120,35 @@ function AppointmentCard({
         <ThemedText type="small" style={{ color: theme.textSecondary }} numberOfLines={1}>
           {appointment.purpose}
         </ThemedText>
-        <View style={styles.cardActions}>
-          <Pressable
-            style={[
-              styles.actionButton,
-              { backgroundColor: theme.success + "15" },
-            ]}
-          >
-            <Feather name="check" size={14} color={theme.success} />
-            <ThemedText type="caption" style={{ color: theme.success }}>
-              Complete
-            </ThemedText>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.actionButton,
-              { backgroundColor: theme.error + "15" },
-            ]}
-          >
-            <Feather name="x" size={14} color={theme.error} />
-            <ThemedText type="caption" style={{ color: theme.error }}>
-              Cancel
-            </ThemedText>
-          </Pressable>
-        </View>
+
+        {(appointment.status === 'booked' || appointment.status === 'pending') && (
+          <View style={styles.cardActions}>
+            <Pressable
+              onPress={onComplete}
+              style={[
+                styles.actionButton,
+                { backgroundColor: theme.success + "15" },
+              ]}
+            >
+              <Feather name="check" size={14} color={theme.success} />
+              <ThemedText type="caption" style={{ color: theme.success }}>
+                Complete
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={onCancel}
+              style={[
+                styles.actionButton,
+                { backgroundColor: theme.error + "15" },
+              ]}
+            >
+              <Feather name="x" size={14} color={theme.error} />
+              <ThemedText type="caption" style={{ color: theme.error }}>
+                Cancel
+              </ThemedText>
+            </Pressable>
+          </View>
+        )}
       </View>
     </AnimatedPressable>
   );
@@ -150,25 +160,70 @@ export default function ProfessionalAppointmentsScreen() {
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
   const [activeTab, setActiveTab] = useState<TabType>("today");
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    fetchAppointments();
+  }, []);
+
+  const fetchAppointments = async () => {
+    try {
+      const response = await appointmentService.getAll();
+      setAppointments(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch appointments:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStatusUpdate = async (id: string, status: string) => {
+    try {
+      if (status === 'cancelled') {
+        await appointmentService.cancel(id);
+      } else {
+        await appointmentService.updateStatus(id, status);
+      }
+      // Refresh appointments
+      fetchAppointments();
+    } catch (error) {
+      console.error(`Failed to update status to ${status}:`, error);
+      Alert.alert("Error", "Failed to update appointment status");
+    }
+  };
 
   const filteredAppointments = useMemo(() => {
-    return PROFESSIONAL_APPOINTMENTS.filter((apt) => {
+    const today = new Date().toISOString().split('T')[0];
+
+    return appointments.filter((apt) => {
+      // Ensure date format matches
+      const aptDate = apt.date.split('T')[0];
+
       if (activeTab === "today") {
-        return apt.date === "2025-12-04";
+        return aptDate === today && (apt.status === "booked" || apt.status === "pending");
       } else if (activeTab === "upcoming") {
         return (
-          apt.date > "2025-12-04" &&
+          aptDate > today &&
           (apt.status === "booked" || apt.status === "pending")
         );
       } else {
         return apt.status === "completed" || apt.status === "cancelled";
       }
     });
-  }, [activeTab]);
+  }, [activeTab, appointments]);
 
   const handleAppointmentPress = (appointmentId: string) => {
     navigation.navigate("AppointmentDetail", { appointmentId });
   };
+
+  if (loading) {
+    return (
+      <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ThemedText>Loading...</ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -210,13 +265,15 @@ export default function ProfessionalAppointmentsScreen() {
           <AppointmentCard
             appointment={item}
             onPress={() => handleAppointmentPress(item.id)}
+            onComplete={() => handleStatusUpdate(item.id, 'completed')}
+            onCancel={() => handleStatusUpdate(item.id, 'cancelled')}
           />
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Feather name="calendar" size={48} color={theme.textTertiary} />
             <ThemedText type="body" style={{ color: theme.textSecondary }}>
-              No appointments
+              No {activeTab} appointments
             </ThemedText>
           </View>
         }

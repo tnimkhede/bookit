@@ -15,8 +15,6 @@ import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   CATEGORIES,
-  PROFESSIONALS,
-  CLIENT_APPOINTMENTS,
   getCategoryIcon,
 } from "@/data/mockData";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
@@ -66,7 +64,7 @@ function ProfessionalCard({
   professional,
   onPress,
 }: {
-  professional: (typeof PROFESSIONALS)[0];
+  professional: Professional;
   onPress: () => void;
 }) {
   const { theme } = useTheme();
@@ -127,14 +125,46 @@ function ProfessionalCard({
   );
 }
 
+import { professionalService } from "@/services/professionalService";
+import { appointmentService } from "@/services/appointmentService";
+import { Professional, Appointment } from "@/data/mockData";
+
 export default function ClientHomeScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
-  const upcomingAppointment = CLIENT_APPOINTMENTS.find(
-    (apt) => apt.status === "booked"
-  );
+  const [professionals, setProfessionals] = React.useState<Professional[]>([]);
+  const [upcomingAppointment, setUpcomingAppointment] = React.useState<Appointment | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [profsData, apptsData] = await Promise.all([
+        professionalService.getAll(),
+        appointmentService.getAll("booked")
+      ]);
+
+      // Backend returns { success: true, data: [...] }
+      setProfessionals(profsData.data || []);
+
+      const appointments = apptsData.data || [];
+      // Find the next upcoming appointment
+      const nextAppt = appointments
+        .filter((appt: Appointment) => new Date(appt.date) >= new Date())
+        .sort((a: Appointment, b: Appointment) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+
+      setUpcomingAppointment(nextAppt || null);
+    } catch (error) {
+      console.error("Failed to fetch home data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCategoryPress = (categoryId: string) => {
     navigation.navigate("BrowseTab", { category: categoryId });
@@ -241,7 +271,7 @@ export default function ClientHomeScreen() {
           </Pressable>
         </View>
         <View style={styles.professionalsContainer}>
-          {PROFESSIONALS.slice(0, 4).map((professional) => (
+          {professionals.slice(0, 4).map((professional) => (
             <ProfessionalCard
               key={professional.id}
               professional={professional}

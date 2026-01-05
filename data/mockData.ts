@@ -50,7 +50,9 @@ export const CATEGORIES = [
   { id: "salon", name: "Salons", icon: "scissors" },
   { id: "lawyer", name: "Lawyers", icon: "briefcase" },
   { id: "consultant", name: "Consultants", icon: "users" },
+  { id: "consultant", name: "Consultants", icon: "users" },
   { id: "tutor", name: "Tutors", icon: "book-open" },
+  { id: "Lawns", name: "Lawns", icon: "sun" },
 ] as const;
 
 export const PROFESSIONALS: Professional[] = [

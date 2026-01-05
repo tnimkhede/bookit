@@ -6,6 +6,7 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  FlatList,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
@@ -19,20 +20,31 @@ import Animated, {
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { PROFESSIONALS, AVAILABLE_TIME_SLOTS, getCategoryIcon } from "@/data/mockData";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
+import { professionalService } from "@/services/professionalService";
+import { appointmentService } from "@/services/appointmentService";
+import { Professional, getCategoryIcon } from "@/data/mockData";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-const AVAILABLE_DATES = [
-  { date: "2025-12-05", label: "Dec 5", day: "Fri" },
-  { date: "2025-12-06", label: "Dec 6", day: "Sat" },
-  { date: "2025-12-08", label: "Dec 8", day: "Mon" },
-  { date: "2025-12-09", label: "Dec 9", day: "Tue" },
-  { date: "2025-12-10", label: "Dec 10", day: "Wed" },
-  { date: "2025-12-11", label: "Dec 11", day: "Thu" },
-  { date: "2025-12-12", label: "Dec 12", day: "Fri" },
-];
+// Generate next 365 days
+const getAvailableDates = () => {
+  const days = [];
+  const today = new Date();
+  for (let i = 0; i < 365; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+    days.push({
+      date: date.toISOString().split('T')[0],
+      label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+    });
+  }
+  return days;
+};
+
+const AVAILABLE_DATES = getAvailableDates();
 
 function StepIndicator({
   currentStep,
@@ -71,71 +83,88 @@ function DateSelector({
 }) {
   const { theme } = useTheme();
 
+  const renderItem = ({ item }: { item: typeof AVAILABLE_DATES[0] }) => (
+    <Pressable
+      onPress={() => onSelect(item.date)}
+      style={[
+        styles.dateCard,
+        {
+          backgroundColor:
+            selectedDate === item.date
+              ? theme.primary
+              : theme.backgroundDefault,
+        },
+        Shadows.small,
+      ]}
+    >
+      <ThemedText
+        type="caption"
+        style={{
+          color:
+            selectedDate === item.date ? "rgba(255,255,255,0.8)" : theme.textTertiary,
+        }}
+      >
+        {item.day}
+      </ThemedText>
+      <ThemedText
+        type="h4"
+        style={{
+          color: selectedDate === item.date ? "#FFFFFF" : theme.text,
+        }}
+      >
+        {item.label.split(" ")[1]}
+      </ThemedText>
+      <ThemedText
+        type="caption"
+        style={{
+          color:
+            selectedDate === item.date ? "rgba(255,255,255,0.8)" : theme.textTertiary,
+        }}
+      >
+        {item.label.split(" ")[0]}
+      </ThemedText>
+    </Pressable>
+  );
+
   return (
-    <ScrollView
+    <FlatList
+      data={AVAILABLE_DATES}
+      renderItem={renderItem}
+      keyExtractor={(item) => item.date}
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.dateScrollContent}
-    >
-      {AVAILABLE_DATES.map((item) => (
-        <Pressable
-          key={item.date}
-          onPress={() => onSelect(item.date)}
-          style={[
-            styles.dateCard,
-            {
-              backgroundColor:
-                selectedDate === item.date
-                  ? theme.primary
-                  : theme.backgroundDefault,
-            },
-            Shadows.small,
-          ]}
-        >
-          <ThemedText
-            type="caption"
-            style={{
-              color:
-                selectedDate === item.date ? "rgba(255,255,255,0.8)" : theme.textTertiary,
-            }}
-          >
-            {item.day}
-          </ThemedText>
-          <ThemedText
-            type="h4"
-            style={{
-              color: selectedDate === item.date ? "#FFFFFF" : theme.text,
-            }}
-          >
-            {item.label.split(" ")[1]}
-          </ThemedText>
-          <ThemedText
-            type="caption"
-            style={{
-              color:
-                selectedDate === item.date ? "rgba(255,255,255,0.8)" : theme.textTertiary,
-            }}
-          >
-            {item.label.split(" ")[0]}
-          </ThemedText>
-        </Pressable>
-      ))}
-    </ScrollView>
+      initialNumToRender={7}
+      maxToRenderPerBatch={10}
+      windowSize={5}
+    />
   );
 }
 
 function TimeSlotGrid({
+  slots,
   selectedSlot,
   onSelect,
+  loading
 }: {
+  slots: { time: string; available: boolean }[];
   selectedSlot: string | null;
   onSelect: (slot: string) => void;
+  loading: boolean;
 }) {
   const { theme } = useTheme();
 
+  if (loading) {
+    return <ThemedText>Loading slots...</ThemedText>;
+  }
+
+  if (slots.length === 0) {
+    return <ThemedText>No slots available for this date.</ThemedText>;
+  }
+
   return (
     <View style={styles.timeSlotGrid}>
-      {AVAILABLE_TIME_SLOTS.map((slot) => (
+      {slots.map((slot) => (
         <Pressable
           key={slot.time}
           onPress={() => slot.available && onSelect(slot.time)}
@@ -174,19 +203,26 @@ function TimeSlotGrid({
   );
 }
 
+
+
 export default function BookAppointmentScreen() {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
 
   const { professionalId } = route.params as { professionalId: string };
-  const professional = PROFESSIONALS.find((p) => p.id === professionalId);
+  const [professional, setProfessional] = useState<Professional | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const [step, setStep] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<{ time: string; available: boolean }[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
   const [purpose, setPurpose] = useState("");
+  const [bookingLoading, setBookingLoading] = useState(false);
 
   const buttonScale = useSharedValue(1);
 
@@ -194,9 +230,58 @@ export default function BookAppointmentScreen() {
     transform: [{ scale: buttonScale.value }],
   }));
 
+  React.useEffect(() => {
+    fetchProfessional();
+  }, [professionalId]);
+
+  React.useEffect(() => {
+    if (selectedDate) {
+      fetchAvailability(selectedDate);
+    }
+  }, [selectedDate]);
+
+  const fetchProfessional = async () => {
+    try {
+      const data = await professionalService.getById(professionalId);
+      setProfessional(data.data || data);
+    } catch (error) {
+      console.error("Failed to fetch professional:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAvailability = async (date: string) => {
+    setSlotsLoading(true);
+    setSelectedSlot(null);
+    try {
+      const response = await professionalService.getAvailability(professionalId, date);
+      const slots = response.data || [];
+      setAvailableSlots(slots);
+
+      // Auto-select "Full Day" for Lawns if available
+      if (professional?.category === 'Lawns' && slots.length > 0 && slots[0].available) {
+        setSelectedSlot(slots[0].time);
+      }
+    } catch (error) {
+      console.error("Failed to fetch availability:", error);
+      setAvailableSlots([]);
+    } finally {
+      setSlotsLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ThemedText>Loading...</ThemedText>
+      </ThemedView>
+    );
+  }
+
   if (!professional) {
     return (
-      <ThemedView style={styles.container}>
+      <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ThemedText>Professional not found</ThemedText>
       </ThemedView>
     );
@@ -215,15 +300,33 @@ export default function BookAppointmentScreen() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step < 3) {
       setStep(step + 1);
     } else {
-      Alert.alert(
-        "Booking Confirmed!",
-        `Your appointment with ${professional.name} on ${selectedDate} at ${selectedSlot} has been booked.`,
-        [{ text: "OK", onPress: () => navigation.goBack() }]
-      );
+      // Submit booking
+      if (!selectedDate || !selectedSlot) return;
+
+      setBookingLoading(true);
+      try {
+        await appointmentService.create({
+          professionalId,
+          date: selectedDate,
+          time: selectedSlot,
+          duration: professional.appointmentDuration,
+          purpose
+        });
+
+        Alert.alert(
+          "Booking Confirmed!",
+          `Your appointment with ${professional.name} on ${selectedDate} at ${selectedSlot} has been booked.`,
+          [{ text: "OK", onPress: () => navigation.goBack() }]
+        );
+      } catch (error: any) {
+        Alert.alert("Booking Failed", error.response?.data?.error || "Something went wrong");
+      } finally {
+        setBookingLoading(false);
+      }
     }
   };
 
@@ -265,9 +368,34 @@ export default function BookAppointmentScreen() {
         return (
           <View style={styles.stepContent}>
             <ThemedText type="body" style={{ color: theme.textSecondary, marginBottom: Spacing.lg }}>
-              Available time slots for {AVAILABLE_DATES.find((d) => d.date === selectedDate)?.label}
+              {professional?.category === 'Lawns'
+                ? `Availability for ${AVAILABLE_DATES.find((d) => d.date === selectedDate)?.label}`
+                : `Available time slots for ${AVAILABLE_DATES.find((d) => d.date === selectedDate)?.label}`
+              }
             </ThemedText>
-            <TimeSlotGrid selectedSlot={selectedSlot} onSelect={setSelectedSlot} />
+
+            {professional?.category === 'Lawns' ? (
+              <View>
+                {availableSlots.length > 0 && availableSlots[0].available ? (
+                  <View style={[styles.timeSlot, { width: '100%', backgroundColor: theme.primary, padding: Spacing.lg }]}>
+                    <ThemedText type="body" style={{ color: '#FFFFFF', fontWeight: '600' }}>
+                      Available for Full Day Booking
+                    </ThemedText>
+                  </View>
+                ) : (
+                  <ThemedText style={{ color: theme.error }}>
+                    Not available on this date.
+                  </ThemedText>
+                )}
+              </View>
+            ) : (
+              <TimeSlotGrid
+                slots={availableSlots}
+                selectedSlot={selectedSlot}
+                onSelect={setSelectedSlot}
+                loading={slotsLoading}
+              />
+            )}
           </View>
         );
       case 2:
@@ -399,11 +527,11 @@ export default function BookAppointmentScreen() {
           onPress={handleNext}
           onPressIn={() => (buttonScale.value = withSpring(0.96))}
           onPressOut={() => (buttonScale.value = withSpring(1))}
-          disabled={!canProceed()}
+          disabled={!canProceed() || bookingLoading}
           style={[
             styles.nextButton,
             {
-              backgroundColor: canProceed() ? theme.primary : theme.backgroundTertiary,
+              backgroundColor: canProceed() && !bookingLoading ? theme.primary : theme.backgroundTertiary,
             },
             animatedButtonStyle,
           ]}
@@ -411,13 +539,13 @@ export default function BookAppointmentScreen() {
           <ThemedText
             type="body"
             style={{
-              color: canProceed() ? "#FFFFFF" : theme.textTertiary,
+              color: canProceed() && !bookingLoading ? "#FFFFFF" : theme.textTertiary,
               fontWeight: "600",
             }}
           >
-            {step === 3 ? "Confirm Booking" : "Next"}
+            {bookingLoading ? "Booking..." : step === 3 ? "Confirm Booking" : "Next"}
           </ThemedText>
-          {step < 3 && (
+          {step < 3 && !bookingLoading && (
             <Feather
               name="arrow-right"
               size={20}

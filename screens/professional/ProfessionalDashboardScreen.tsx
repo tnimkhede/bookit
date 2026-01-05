@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { StyleSheet, View, Pressable, ScrollView } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -13,7 +13,8 @@ import { ScreenScrollView } from "@/components/ScreenScrollView";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/contexts/AuthContext";
-import { PROFESSIONAL_APPOINTMENTS, getStatusColor } from "@/data/mockData";
+import { getStatusColor } from "@/data/mockData";
+import { appointmentService } from "@/services/appointmentService";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -55,7 +56,7 @@ function TimelineItem({
   onPress,
   isLast,
 }: {
-  appointment: (typeof PROFESSIONAL_APPOINTMENTS)[0];
+  appointment: any;
   onPress: () => void;
   isLast: boolean;
 }) {
@@ -113,10 +114,27 @@ export default function ProfessionalDashboardScreen() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    fetchAppointments();
+  }, []);
+
+  const fetchAppointments = async () => {
+    try {
+      const response = await appointmentService.getAll();
+      setAppointments(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch appointments:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const today = new Date().toISOString().split("T")[0];
-  const todaysAppointments = PROFESSIONAL_APPOINTMENTS.filter(
-    (apt) => apt.date === "2025-12-04"
+  const todaysAppointments = appointments.filter(
+    (apt) => apt.date.split('T')[0] === today
   );
 
   const stats = {

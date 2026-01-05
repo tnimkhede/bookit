@@ -1,11 +1,13 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { StyleSheet, View, Pressable, Switch } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
 import { ScreenScrollView } from "@/components/ScreenScrollView";
 import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
-import { PROFESSIONALS } from "@/data/mockData";
+import { useAuth } from "@/contexts/AuthContext";
+import { professionalService } from "@/services/professionalService";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 
 function DayScheduleCard({
@@ -45,7 +47,7 @@ function DayScheduleCard({
       </View>
       <Switch
         value={isWorking}
-        onValueChange={() => {}}
+        onValueChange={() => { }}
         trackColor={{ false: theme.backgroundTertiary, true: theme.accent + "50" }}
         thumbColor={isWorking ? theme.accent : theme.textTertiary}
       />
@@ -86,8 +88,40 @@ function BlockedDateCard({ date }: { date: string }) {
 
 export default function ScheduleScreen() {
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const [professional, setProfessional] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const professional = PROFESSIONALS[0];
+  React.useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const response = await professionalService.getMe();
+      setProfessional(response.data || response);
+    } catch (error) {
+      console.error("Failed to fetch profile:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ThemedText>Loading...</ThemedText>
+      </ThemedView>
+    );
+  }
+
+  if (!professional) {
+    return (
+      <ThemedView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ThemedText>Profile not found</ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
     <ScreenScrollView>
@@ -99,7 +133,7 @@ export default function ScheduleScreen() {
           </Pressable>
         </View>
         <View style={styles.daysContainer}>
-          {professional.workingHours.map((schedule) => (
+          {professional.workingHours?.map((schedule: any) => (
             <DayScheduleCard
               key={schedule.day}
               day={schedule.day}
@@ -145,9 +179,9 @@ export default function ScheduleScreen() {
           </Pressable>
         </View>
 
-        {professional.blockedDates.length > 0 ? (
+        {professional.blockedDates?.length > 0 ? (
           <View style={styles.blockedDatesContainer}>
-            {professional.blockedDates.map((date) => (
+            {professional.blockedDates.map((date: string) => (
               <BlockedDateCard key={date} date={date} />
             ))}
           </View>

@@ -1,0 +1,26 @@
+/* Toast Container Customization */
+.Toastify__toast-container {
+  z-index: 99999;
+}
+
+.Toastify__toast {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-family);
+}
+
+.Toastify__toast--success {
+  background: var(--success-gradient);
+}
+
+.Toastify__toast--error {
+  background: var(--secondary-gradient);
+}
+
+.Toastify__toast--warning {
+  background: var(--warning-gradient);
+}
+
+.Toastify__toast--info {
+  background: var(--primary-gradient);
+}

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { authService } from "../services/authService";
 
 export type UserRole = "professional" | "client";
 
@@ -16,53 +17,57 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string, role: UserRole) => boolean;
+  login: (email: string, password: string, role: UserRole) => Promise<boolean>;
   logout: () => void;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const HARDCODED_USERS = {
-  professional: {
-    email: "doctor@app.com",
-    password: "professional123",
-    user: {
-      id: "prof-1",
-      email: "doctor@app.com",
-      name: "Dr. Sarah Johnson",
-      role: "professional" as UserRole,
-      phone: "+1 (555) 123-4567",
-      category: "Doctor",
-      location: "New York, NY",
-    },
-  },
-  client: {
-    email: "client@app.com",
-    password: "client123",
-    user: {
-      id: "client-1",
-      email: "client@app.com",
-      name: "John Smith",
-      role: "client" as UserRole,
-      phone: "+1 (555) 987-6543",
-      location: "Brooklyn, NY",
-    },
-  },
-};
+
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = (email: string, password: string, role: UserRole): boolean => {
-    const userData = HARDCODED_USERS[role];
-    if (userData.email === email && userData.password === password) {
-      setUser(userData.user);
-      return true;
+  useEffect(() => {
+    checkUser();
+  }, []);
+
+  const checkUser = async () => {
+    try {
+      const currentUser = await authService.getCurrentUser();
+      if (currentUser) {
+        setUser(currentUser);
+      }
+    } catch (error) {
+      console.log('No user logged in');
+    } finally {
+      setLoading(false);
     }
-    return false;
   };
 
-  const logout = () => {
+  const login = async (email: string, password: string, role: UserRole): Promise<boolean> => {
+    try {
+      const data = await authService.login(email, password);
+      if (data.user) {
+        // Verify role matches
+        if (data.user.role !== role) {
+          await authService.logout();
+          return false;
+        }
+        setUser(data.user);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Login failed:', error);
+      return false;
+    }
+  };
+
+  const logout = async () => {
+    await authService.logout();
     setUser(null);
   };
 
@@ -73,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         login,
         logout,
+        loading
       }}
     >
       {children}

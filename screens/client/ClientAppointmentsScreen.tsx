@@ -15,7 +15,8 @@ import Animated, {
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { CLIENT_APPOINTMENTS, getStatusColor, getCategoryIcon } from "@/data/mockData";
+import { getStatusColor, getCategoryIcon } from "@/data/mockData";
+import { appointmentService } from "@/services/appointmentService";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -61,7 +62,7 @@ function AppointmentCard({
   appointment,
   onPress,
 }: {
-  appointment: (typeof CLIENT_APPOINTMENTS)[0];
+  appointment: any;
   onPress: () => void;
 }) {
   const { theme } = useTheme();
@@ -147,9 +148,26 @@ export default function ClientAppointmentsScreen() {
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
   const [activeTab, setActiveTab] = useState<TabType>("upcoming");
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    fetchAppointments();
+  }, []);
+
+  const fetchAppointments = async () => {
+    try {
+      const response = await appointmentService.getAll();
+      setAppointments(response.data || []);
+    } catch (error) {
+      console.error("Failed to fetch appointments:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredAppointments = useMemo(() => {
-    return CLIENT_APPOINTMENTS.filter((apt) => {
+    return appointments.filter((apt) => {
       if (activeTab === "upcoming") {
         return apt.status === "booked" || apt.status === "pending";
       } else if (activeTab === "past") {
@@ -158,11 +176,19 @@ export default function ClientAppointmentsScreen() {
         return apt.status === "cancelled";
       }
     });
-  }, [activeTab]);
+  }, [activeTab, appointments]);
 
   const handleAppointmentPress = (appointmentId: string) => {
     navigation.navigate("AppointmentDetail", { appointmentId });
   };
+
+  if (loading) {
+    return (
+      <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ThemedText>Loading...</ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container}>

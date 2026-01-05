@@ -1,12 +1,13 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
   View,
   TextInput,
   Pressable,
   FlatList,
+  ActivityIndicator,
 } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,9 +21,10 @@ import Animated, {
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { CATEGORIES, PROFESSIONALS, getCategoryIcon } from "@/data/mockData";
+import { CATEGORIES, getCategoryIcon } from "@/data/mockData";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 import { useHeaderHeight } from "@react-navigation/elements";
+import { professionalService } from "@/services/professionalService";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -64,7 +66,7 @@ function ProfessionalListItem({
   professional,
   onPress,
 }: {
-  professional: (typeof PROFESSIONALS)[0];
+  professional: any;
   onPress: () => void;
 }) {
   const { theme } = useTheme();
@@ -117,12 +119,13 @@ function ProfessionalListItem({
           <View style={styles.metaRow}>
             <Feather name="star" size={12} color={theme.warning} />
             <ThemedText type="caption" style={{ fontWeight: "500" }}>
-              {professional.rating}
+              {professional.rating || "N/A"}
             </ThemedText>
           </View>
-          <ThemedText type="caption" style={{ color: theme.accent }}>
-            Next: {professional.nextAvailable}
-          </ThemedText>
+          {/* API doesn't return nextAvailable yet, so we hide it or show generic text */}
+          {/* <ThemedText type="caption" style={{ color: theme.accent }}>
+            Next: Available
+          </ThemedText> */}
         </View>
       </View>
       <Feather name="chevron-right" size={20} color={theme.textTertiary} />
@@ -141,18 +144,42 @@ export default function BrowseScreen() {
   const initialCategory = (route.params as any)?.category || "all";
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+  const [professionals, setProfessionals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredProfessionals = useMemo(() => {
-    return PROFESSIONALS.filter((professional) => {
-      const matchesSearch =
-        professional.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        professional.category.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory =
-        selectedCategory === "all" ||
-        professional.category.toLowerCase() === selectedCategory;
-      return matchesSearch && matchesCategory;
-    });
+  const fetchProfessionals = async () => {
+    setLoading(true);
+    try {
+      const params: any = {};
+      if (selectedCategory !== "all") {
+        params.category = selectedCategory;
+      }
+      if (searchQuery) {
+        params.search = searchQuery;
+      }
+      const data = await professionalService.getAll(params);
+      setProfessionals(data.data || []);
+    } catch (error) {
+      console.error("Failed to fetch professionals", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Debounce search or just fetch on effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProfessionals();
+    }, 300); // Simple debounce
+    return () => clearTimeout(timer);
   }, [searchQuery, selectedCategory]);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Optional: Refresh when screen comes into focus if needed
+      // fetchProfessionals();
+    }, [])
+  );
 
   const handleProfessionalPress = (professionalId: string) => {
     navigation.navigate("ProfessionalDetail", { professionalId });
@@ -206,29 +233,35 @@ export default function BrowseScreen() {
         />
       </View>
 
-      <FlatList
-        data={filteredProfessionals}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={[
-          styles.listContainer,
-          { paddingBottom: tabBarHeight + Spacing.xl },
-        ]}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <ProfessionalListItem
-            professional={item}
-            onPress={() => handleProfessionalPress(item.id)}
-          />
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Feather name="search" size={48} color={theme.textTertiary} />
-            <ThemedText type="body" style={{ color: theme.textSecondary }}>
-              No professionals found
-            </ThemedText>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={professionals}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={[
+            styles.listContainer,
+            { paddingBottom: tabBarHeight + Spacing.xl },
+          ]}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <ProfessionalListItem
+              professional={item}
+              onPress={() => handleProfessionalPress(item.id)}
+            />
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Feather name="search" size={48} color={theme.textTertiary} />
+              <ThemedText type="body" style={{ color: theme.textSecondary }}>
+                No professionals found
+              </ThemedText>
+            </View>
+          }
+        />
+      )}
     </ThemedView>
   );
 }
@@ -308,5 +341,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: Spacing["5xl"],
     gap: Spacing.lg,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

@@ -1,0 +1,143 @@
+.users-page {
+    max-width: 1200px;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.header-actions {
+    display: flex;
+    gap: 16px;
+}
+
+.search-form {
+    position: relative;
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+}
+
+.search-form input {
+    padding: 10px 16px 10px 36px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    width: 240px;
+    font-size: 14px;
+}
+
+.filter-wrapper {
+    position: relative;
+}
+
+.filter-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+.filter-wrapper select {
+    padding: 10px 32px 10px 36px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: white;
+    font-size: 14px;
+    appearance: none;
+    cursor: pointer;
+}
+
+.table-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th {
+    text-align: left;
+    padding: 16px 24px;
+    background: #f8fafc;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.data-table td {
+    padding: 16px 24px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    font-size: 14px;
+}
+
+.data-table tr:last-child td {
+    border-bottom: none;
+}
+
+.user-name {
+    font-weight: 500;
+    color: #1e293b;
+}
+
+.role-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.role-badge.admin {
+    background: #f3e8ff;
+    color: #7e22ce;
+}
+
+.role-badge.professional {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.role-badge.client {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.action-btn.delete {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.action-btn.delete:hover {
+    background: #fee2e2;
+}
+
+.empty-cell {
+    text-align: center;
+    color: #94a3b8;
+    padding: 40px;
+}

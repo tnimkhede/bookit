@@ -24,9 +24,13 @@ import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+
 export default function LoginScreen() {
   const { theme, isDark } = useTheme();
   const { login } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const insets = useSafeAreaInsets();
 
   const [role, setRole] = useState<UserRole>("client");
@@ -41,15 +45,19 @@ export default function LoginScreen() {
     transform: [{ scale: buttonScale.value }],
   }));
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email || !password) {
       setError("Please enter both email and password");
       return;
     }
 
-    const success = login(email, password, role);
-    if (!success) {
-      setError("Invalid email or password");
+    try {
+      const success = await login(email, password, role);
+      if (!success) {
+        setError("Invalid email or password");
+      }
+    } catch (err) {
+      setError("Login failed. Please try again.");
     }
   };
 
@@ -91,7 +99,7 @@ export default function LoginScreen() {
             />
           </View>
           <ThemedText type="h1" style={styles.title}>
-            BookIt
+            QBOOKIT
           </ThemedText>
           <ThemedText type="small" style={styles.subtitle}>
             Your Universal Scheduling Solution
@@ -256,16 +264,23 @@ export default function LoginScreen() {
             </ThemedText>
           </AnimatedPressable>
 
-          <View style={styles.credentialsHint}>
-            <ThemedText type="caption" style={{ color: theme.textTertiary }}>
-              Demo Credentials:
-            </ThemedText>
-            <ThemedText type="caption" style={{ color: theme.textTertiary }}>
-              Client: client@app.com / client123
-            </ThemedText>
-            <ThemedText type="caption" style={{ color: theme.textTertiary }}>
-              Professional: doctor@app.com / professional123
-            </ThemedText>
+          <View style={styles.footer}>
+            <Pressable onPress={() => navigation.navigate("ForgotPassword")}>
+              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                Forgot Password?
+              </ThemedText>
+            </Pressable>
+
+            <View style={styles.registerContainer}>
+              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                Don't have an account?
+              </ThemedText>
+              <Pressable onPress={() => navigation.navigate("Register")}>
+                <ThemedText type="caption" style={{ color: theme.primary, fontWeight: "600" }}>
+                  Create Account
+                </ThemedText>
+              </Pressable>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -363,9 +378,13 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "600",
   },
-  credentialsHint: {
+  footer: {
     alignItems: "center",
-    gap: Spacing.xs,
+    gap: Spacing.lg,
     marginTop: Spacing.lg,
   },
+  registerContainer: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+  }
 });

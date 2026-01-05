@@ -13,7 +13,8 @@ import Animated, {
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { PROFESSIONALS, getCategoryIcon } from "@/data/mockData";
+import { professionalService } from "@/services/professionalService";
+import { Professional, getCategoryIcon } from "@/data/mockData";
 import { Spacing, BorderRadius, Shadows } from "@/constants/theme";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -25,7 +26,8 @@ export default function ProfessionalDetailScreen() {
   const insets = useSafeAreaInsets();
 
   const { professionalId } = route.params as { professionalId: string };
-  const professional = PROFESSIONALS.find((p) => p.id === professionalId);
+  const [professional, setProfessional] = React.useState<Professional | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
   const buttonScale = useSharedValue(1);
 
@@ -33,9 +35,33 @@ export default function ProfessionalDetailScreen() {
     transform: [{ scale: buttonScale.value }],
   }));
 
+  React.useEffect(() => {
+    fetchProfessional();
+  }, [professionalId]);
+
+  const fetchProfessional = async () => {
+    try {
+      const data = await professionalService.getById(professionalId);
+      // Backend returns { success: true, data: {...} }
+      setProfessional(data.data || data);
+    } catch (error) {
+      console.error("Failed to fetch professional:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ThemedText>Loading...</ThemedText>
+      </ThemedView>
+    );
+  }
+
   if (!professional) {
     return (
-      <ThemedView style={styles.container}>
+      <ThemedView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ThemedText>Professional not found</ThemedText>
       </ThemedView>
     );
